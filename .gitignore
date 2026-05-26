@@ -5,6 +5,7 @@ dist/
 __pycache__/
 *.pyc
 .venv/
+.venv-wsl/
 venv/
 
 # Editors / OS

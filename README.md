@@ -1,12 +1,18 @@
+<p align="center">
+  <img src="assets/claude-code-tips-site.png" alt="Claude Code Engineering Tips rendered as a terminal-style site" width="900">
+</p>
+
 # Claude Code Engineering Tips
 
-How to use Claude Code well at work without wasting tokens. Every tip cites Anthropic docs, something Boris Cherny said publicly, or a published field heuristic.
+[![Read the guide](https://img.shields.io/badge/Guide-View_on_GitHub_Pages-F06323?style=for-the-badge&logo=github&logoColor=white)](https://juanjofuchs.github.io/claude-code-tips/)
 
-**Audience:** developers using Claude Code at work, especially those on a Claude Enterprise plan. I write from inside an enterprise environment with 1M Opus context and auto-compaction configured at 400,000 tokens org-wide — your specific numbers may differ, but the patterns apply either way.
+How to use Claude Code well without wasting tokens. Every tip cites Anthropic docs, something Boris Cherny said publicly, or a published field heuristic.
+
+**Audience:** developers using Claude Code, especially those on a Claude Enterprise plan. I write from inside an enterprise environment with 1M Opus context and auto-compaction configured at 400,000 tokens org-wide, your specific numbers may differ but the patterns apply either way.
 
 **How to read:** skim the TL;DR, then read the sections that apply.
 
-**How each tip is structured:** *Advice* up top (what to do), *Technical Explanation* in the middle (why it works, with sources), *Call to Action* at the bottom (the concrete step you can take today).
+**How each tip is structured:** *Advice* up top (what to do), *Technical Explanation* in the middle (why it works), *Your Turn* at the bottom (the concrete step you can take today), with sources tucked into a collapsible below.
 
 ---
 
@@ -16,18 +22,18 @@ This doc lives in [`JuanjoFuchs/claude-code-tips`](https://github.com/JuanjoFuch
 
 > *"Use `gh` cli to inspect `JuanjoFuchs/claude-code-tips`. Read the tips relevant to what we're doing right now, then propose how to integrate them into this workflow."*
 
-The goal is to convert reading into a change in how you actually work, and to keep this guide grounded in real shipping work, not theory.
+Use this repo to change how you run Claude Code sessions. Point Claude at it, pull the relevant tip, and turn the reading into a workflow change.
 
 ---
 
 ## TL;DR
 
 1. Write the spec first with verification built in. Then plan, then execute.
-2. Send complete prompts, not under-specified ones followed by corrections.
+2. Send long, complete prompts, not under-specified ones followed by corrections.
 3. One coherent workstream per conversation. `/clear` between topics.
 4. Configure a status line. `/compact` for length, `/clear` for switches, handoff doc for pauses over an hour. When Claude warns about uncached tokens, follow the suggestion.
-5. Babysit feature implementations. Hit `esc` to interrupt, `esc esc esc` (or `/rewind`) to roll back and improve the prompt or spec. Don't run feature work on autopilot.
-6. `/rewind` when Claude goes wrong, don't type corrections.
+5. Babysit implementations. Hit `esc` to interrupt. Only reach for `/goal` or `/loop` when you're actually willing to spend the tokens.
+6. `/rewind` (or `esc esc`) when Claude goes wrong, don't type corrections.
 7. Opus `xhigh` is the team lead, not the team. Delegate execution to Sonnet or Haiku subagents.
 8. For tool-heavy sessions, filter at the CLI and delegate noisy work to subagents.
 9. Prefer agent-aware CLIs over MCPs. Install and authenticate the toolbox before the session.
@@ -47,7 +53,7 @@ Before any non-trivial coding work, have Claude write a spec. Iterate on the spe
 
 ### Technical Explanation
 
-Broad wandering sessions are the single biggest driver of cost and quality problems. A clear spec turns a multi-hour session of clarification and correction into a one-shot implementation. Verification is the multiplier, with tests, expected outputs, and acceptance criteria, Claude checks its own work instead of making you the only feedback loop.
+Wandering sessions get expensive fast. A clear spec cuts the clarification loop, and explicit verification gives Claude something concrete to check before it calls the work done.
 
 The discipline that makes this pay off:
 
@@ -59,32 +65,37 @@ The discipline that makes this pay off:
 - **No "Future Considerations" sections.** Agents treat every section as actionable. A "nice to have" list becomes scope creep. Track future ideas elsewhere.
 - **Implementation isn't verification.** State the completion bar near the top of the spec, code that builds isn't the same as code that's verified to work. Force the agent to iterate until AC verification passes.
 
-**Sources:** [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices), [Boris on How Boris Uses Claude Code](https://howborisusesclaudecode.com/).
+[Spec Kit](https://github.com/github/spec-kit) is the most popular spec-driven development toolkit if you want a structured starting point. One caveat matters more than the tooling, read and agree with every line of the spec before anything gets built. If a line is off, clean it up and reiterate aggressively first. One line in a spec easily becomes a thousand lines of code, and if you won't read the one line, you're definitely not reading the thousand.
 
-### Call to Action
+### Your Turn
 
 1. Ask Claude *"write a spec for X. What not how, contracts only in code, capture the why, explicit Out of Scope, Acceptance Criteria with checkboxes, and a verification plan."*
 2. Review and iterate on the spec yourself until it's clear.
 3. Enter plan mode (Shift+Tab to cycle modes) and have Claude write the implementation plan.
 4. Approve the plan and execute. Don't stop until every AC is verified.
 
+**Sources:**
+
+- [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices)
+- [Boris on How Boris Uses Claude Code](https://howborisusesclaudecode.com/)
+
 ---
 
-## 2. Send complete prompts
+## 2. Send long, complete prompts
 
 ### Advice
 
-Be explicit and complete about what you want. The goal is fewer turns to reach the outcome, not shorter prompts.
+Send a long, complete prompt that front-loads everything Claude needs. Long prompts are cheaper when they prevent five correction turns.
 
 ### Technical Explanation
 
-Each round-trip has overhead and forces the model to reload context. A single complete prompt that includes goal, constraints, examples, and definition of done produces a one-shot result. The same content split across five "actually, also..." follow-ups costs more tokens, takes longer, and produces worse output because the model is reasoning over a noisy, growing thread.
+Each round-trip has overhead and forces the model to reload context. A complete prompt gives Claude the goal, constraints, examples, and definition of done up front. Splitting the same information across five "actually, also..." follow-ups costs more and makes the thread noisier.
 
-The blocker isn't knowing this, it's that a thorough prompt feels slow to write. That friction creates under-specified requests, and under-specified requests create expensive clarification loops.
+Writing the prompt feels slow, so people send thin requests and pay for the clarification loop later.
 
 #### Reference files with `@`, don't paste them
 
-Completeness gets misread as "paste everything into the prompt." Don't. Pasted blobs sit in context whether the model needs them or not, and they bloat the prefix every turn for the rest of the session. Claude Code supports `@`-references for exactly this reason, you mention the file path and the harness loads it on demand:
+Completeness gets misread as "paste everything into the prompt." Don't. Pasted blobs sit in context whether the model needs them or not, and they bloat the prefix every turn for the rest of the session. Claude Code supports `@`-references: mention the file path and the harness loads it when needed.
 
 ```text
 Refactor the deploy step described in @specs/deploy.md to use the new auth flow from @src/auth/session.ts.
@@ -95,11 +106,15 @@ The integration tests in @tests/deploy.spec.ts already cover the failure modes I
 
 Rule of thumb, if you're about to paste more than a few lines, use `@` instead.
 
-**Sources:** [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices) (covers `@`-mention syntax for files and folders), [Anthropic on reducing latency and round-trips](https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/reduce-latency), [Vercel, AGENTS.md outperforms skills in our agent evals](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals) (static, referenceable docs beat on-demand retrieval, 100% vs 79% pass rate).
+### Your Turn
 
-### Call to Action
+Before sending, ask yourself *"does this prompt have everything Claude needs to finish in one pass, goal, constraints, examples, definition of done?"* If not, add what's missing, don't send and patch. **Reference files with `@path/to/file`** instead of pasting their contents. Writing a long prompt feels slow, so dictation is the cheat code when typing is the bottleneck, I use [Wispr Flow](https://wisprflow.ai/r?JUANJO60) (a free month with that link) and [Typeless](https://www.typeless.com/refer?code=HWQQ99W) ($5 with that link).
 
-Before sending, ask yourself *"does this prompt have everything Claude needs to finish in one pass, goal, constraints, examples, definition of done?"* If not, add what's missing, don't send and patch. **Reference files with `@path/to/file`** instead of pasting their contents. Dictation works well for the rest if typing is the bottleneck.
+**Sources:**
+
+- [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices) (covers `@`-mention syntax for files and folders)
+- [Anthropic on reducing latency and round-trips](https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/reduce-latency)
+- [Vercel, AGENTS.md outperforms skills in our agent evals](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals) (static, referenceable docs beat on-demand retrieval, 100% vs 79% pass rate)
 
 ---
 
@@ -115,19 +130,23 @@ New task, new thread. Don't debug auth, then write docs, then analyze logs, then
 
 ### Technical Explanation
 
-Anthropic documents the "kitchen sink session" as a common failure pattern. Mixed context degrades quality on every sub-task and inflates per-turn cost on every prompt afterward, you're paying to re-process irrelevant noise. The fix is explicit and free, `/clear` between unrelated tasks.
+Anthropic documents the "kitchen sink session" as a common failure pattern. Mixed context degrades quality on every sub-task and inflates per-turn cost on every prompt afterward, you're paying to re-process irrelevant noise. Use `/clear` between unrelated tasks.
 
-The practical shape is focused work chunks. Spec the work, plan it, execute it, verify it, then either keep going because the context is still directly useful or leave a short handoff and start clean. Don't keep a near-1M-token session alive through meetings, lunch, and unrelated work just because the window exists. If the cache expires, the next turn reloads a large prefix at full input price. If the topic changed, even a cache hit is just cheap access to stale context.
+Work in focused chunks. Spec the work, plan it, execute it, verify it, then either keep going because the context is still directly useful or leave a short handoff and start clean. Don't keep a near-1M-token session alive through meetings, lunch, and unrelated work just because the window exists. If the cache expires, the next turn reloads a large prefix at full input price. If the topic changed, even a cache hit is just cheap access to stale context.
 
-**Sources:** [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices), [Claude Code costs documentation](https://code.claude.com/docs/en/costs), [How Do AI Agents Spend Your Money?](https://arxiv.org/abs/2604.22750).
-
-### Call to Action
+### Your Turn
 
 Personal rule, *"one coherent workstream per conversation, keep going until the context stops helping."* When you catch yourself prefixing a prompt with "okay, switching topics," that's the signal. Ask Claude for a brief handoff if needed, then:
 
 ```bash
 /clear
 ```
+
+**Sources:**
+
+- [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices)
+- [Claude Code costs documentation](https://code.claude.com/docs/en/costs)
+- [How Do AI Agents Spend Your Money?](https://arxiv.org/abs/2604.22750)
 
 ---
 
@@ -142,7 +161,7 @@ Three tools, three jobs:
 /clear     # fresh start, hard task switches
 ```
 
-Plus a hand-written handoff doc for pauses longer than an hour. Watch context-window usage in your status line. When Claude Code surfaces an uncached-token warning, **follow its suggestion**, that footer is telling you the next turn will not hit the cache. `/clear` (or write a handoff and start fresh) is the right move, not "just keep going."
+Plus a hand-written handoff doc for pauses longer than an hour. Watch context-window usage in your status line. When Claude Code surfaces an uncached-token warning, clear, compact, or write a handoff before continuing.
 
 ### Technical Explanation
 
@@ -154,7 +173,7 @@ Plus a hand-written handoff doc for pauses longer than an hour. Watch context-wi
 
 #### The 62.5-minute rule
 
-The default prompt cache lives for 5 minutes, refreshed every time you hit it with a request. An optional 1-hour extended cache exists, but Claude Code uses the 5-minute default. Skidmore's published math gives the exact break-even, refreshing the 5-min cache stays cheaper than letting it die and rewriting later only if you'll need the prefix again within ~62.5 minutes. Past that, refresh tokens add up to more than one full rewrite, so it's cheaper to let it expire.
+The default prompt cache lives for 5 minutes, refreshed each time you hit it with a request. An optional 1-hour extended cache exists, but Claude Code uses the 5-minute default. Skidmore's math puts the break-even around 62.5 minutes. If you need the prefix sooner than that, refreshing is cheaper. Past that, let it expire.
 
 Practically, if you're stepping away for more than an hour, the cache dies regardless. Don't let it die with state you care about still in the window.
 
@@ -162,9 +181,7 @@ Practically, if you're stepping away for more than an hour, the cache dies regar
 
 When you need to stop work for longer than the cache will survive (meetings, lunch, end of day, switching machines), don't just leave the session open and come back. The next prompt after a cold cache pays full-price input on the entire prefix, and at 200K+ tokens that's real money on every turn afterward, plus quality drops because the window is now stale.
 
-The fix is mechanical:
-
-1. Before leaving, ask Claude to write a short handoff doc, current goal, what's done, what's next, key files, open questions, any non-obvious decisions made so far.
+1. Before leaving, ask Claude for a short handoff doc: current goal, what's done, what's next, key files, open questions, and decisions made so far.
 2. Save it somewhere durable (vault note, scratch file, PR description draft).
 3. End the session.
 4. When you come back, open a fresh window and paste the handoff as the new brief.
@@ -173,7 +190,7 @@ You pay the cost of writing one summary instead of re-caching everything you acc
 
 #### Reading the uncached-token indicator (and why to obey it)
 
-Claude Code surfaces a footer hint after prompt-cache expiry showing roughly how many tokens the next turn will send uncached, often with a literal suggestion to run `/clear`. **Treat that as authoritative.** It's not a stylistic nudge, it's the harness telling you the cache no longer covers the prefix, so the next prompt is going to send the whole window at full input price.
+Claude Code surfaces a footer hint after prompt-cache expiry showing roughly how many tokens the next turn will send uncached, often with a literal suggestion to run `/clear`. That's a cost signal. The cache no longer covers the prefix, so the next prompt is going to send the whole window at full input price.
 
 You see it when:
 
@@ -192,9 +209,7 @@ Or write a handoff doc and start a new session if the pause was long. The wrong 
 
 This is separate from old long-context premium pricing. Current 1M-context pricing can be flat per token while context remains expensive in practice. A 900K-token session is still 100× the input of a 9K-token session, and the cost compounds across turns. Cache helps when you're actively working in the same prefix, it doesn't make irrelevant history free, and it doesn't fix the quality cost of stale context.
 
-**Sources:** [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices), [Boris on How Boris Uses Claude Code](https://howborisusesclaudecode.com/), [Anthropic prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching), [Claude Code changelog 2.1.92](https://code.claude.com/docs/en/changelog), [Claude Code status line docs](https://code.claude.com/docs/en/statusline), [Ryan Skidmore on Claude cache tokenomics](https://skids.dev/blog/anthropic-cache-tokenomics/).
-
-### Call to Action
+### Your Turn
 
 Configure the status line so context usage and cache health are visible at all times. The fastest path is the [ccstatusline](https://github.com/sirmalloc/ccstatusline) interactive configurator, or you can wire it up by hand per the [statusline docs](https://code.claude.com/docs/en/statusline):
 
@@ -211,41 +226,54 @@ Build the three-tool reflex:
 # handoff doc for any pause longer than an hour
 ```
 
-When Claude shows the uncached-token hint, **do what it says**, don't argue with the harness.
+When Claude shows the uncached-token hint, clear, compact, or write a handoff before continuing.
+
+**Sources:**
+
+- [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices)
+- [Boris on How Boris Uses Claude Code](https://howborisusesclaudecode.com/)
+- [Anthropic prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+- [Claude Code changelog 2.1.92](https://code.claude.com/docs/en/changelog)
+- [Claude Code status line docs](https://code.claude.com/docs/en/statusline)
+- [Ryan Skidmore on Claude cache tokenomics](https://skids.dev/blog/anthropic-cache-tokenomics/)
 
 ---
 
-## 5. Babysit feature implementations, don't run them on autopilot
+## 5. Babysit implementations, only loop when you'll spend the tokens
 
 ### Advice
 
-Whenever you let Claude fully implement a feature, **watch it**. Don't kick off `/goal`, `/loop`, Ralph-style loops, or auto mode and walk away. Sit with the session. The moment the approach looks wrong, the file edits look off, or the test plan is drifting, **hit `esc` to interrupt**, then rewind and fix the prompt or spec instead of trying to correct mid-stride.
+Babysit implementations. When you let Claude fully implement something, **watch it**. Only use `/goal`, `/loop`, Ralph-style loops, or auto mode when you're willing to spend the tokens. They keep acting until a condition is met or you stop them. Sit with the session. The moment the approach looks wrong, the file edits look off, or the test plan is drifting, **hit `esc` to interrupt**, then fix the prompt or spec instead of correcting mid-stride.
 
 ```bash
 esc          # interrupt the current turn immediately
-esc esc esc  # rewind: triple-tap esc to jump back to an earlier point
-/rewind      # same idea via slash command, pick the exact checkpoint to return to
 ```
 
 Autonomous loops are fine for narrow, bounded, mechanically-verifiable work (test-fix loops, formatting/lint cleanup, generated docs). They are the wrong default for feature work.
 
 ### Technical Explanation
 
-The cost problem is structural. Autonomous modes keep running until a condition is met or you clear them, every extra turn reads context, runs tools, evaluates state, and can compound a bad assumption before you notice. Ralph-style loops keep feeding the same task back after Claude tries to stop.
+Autonomous modes keep running until a condition is met or you stop them. Each extra turn reads context, runs tools, evaluates state, and can compound a bad assumption before you notice. Ralph-style loops keep feeding the same task back after Claude tries to stop.
 
-The quality problem is the same. Long-running agents don't just write more code, they create longer trajectories. If the trajectory is wrong, more autonomy means more cleanup.
+Wrong trajectories get more expensive the longer they run.
 
-Babysitting is not a vibe, it's the cheapest correction loop the harness offers. Watching the session live means you catch the wrong approach at turn 2, not turn 22. The diff is small, the prompt is fresh, and you can rewind cheaply. Walk away from the same session, come back, and you're cleaning up 20 turns of compounded drift instead of fixing one bad sentence in the spec.
+Watching the session live lets you catch the wrong approach at turn 2 instead of cleaning up 20 turns later. Walk away from the same session, come back, and you're cleaning up compounded drift instead of fixing one bad sentence in the spec.
 
-The `esc` reflex matters here. A single `esc` cancels the current turn, three `esc`s rewinds to an earlier checkpoint (same operation as `/rewind`, just faster). When the trajectory looks wrong, the correct move is almost never "type a follow-up explaining what I really wanted." It's interrupt, rewind to before the misunderstanding, and **rewrite the prompt or update the spec** so the next attempt doesn't repeat the mistake. Corrective prompts pollute the context with the wrong path; rewinding plus a sharper prompt leaves a clean prefix.
+A single `esc` cancels the current turn the instant the trajectory looks wrong. Don't type a follow-up explaining what you really wanted, interrupt and **rewrite the prompt or update the spec** so the next attempt doesn't repeat the mistake. Corrective prompts pollute the context with the wrong path. Tip 6 covers rewinding back to a clean checkpoint.
 
-Autonomous loops are fine for narrow, bounded work with hard verification, isolated refactors, test-fix loops, formatting/lint cleanup, backlog chores, generated docs, or low-risk branches where failure is cheap. If you use them, set an explicit turn/time cap, require a clean verification command, and inspect the diff before merging.
+Autonomous loops are fine for narrow, bounded work with hard verification. If you use one, set a turn/time cap, require a clean verification command, and inspect the diff before merging.
 
-**Sources:** [Claude Code `/goal` documentation](https://code.claude.com/docs/en/goal), [Claude Code Ralph Wiggum plugin](https://github.com/anthropics/claude-code/blob/main/plugins/ralph-wiggum/README.md), [Claude Code best practices](https://code.claude.com/docs/en/best-practices), [Boris on How Boris Uses Claude Code](https://howborisusesclaudecode.com/), [How Do AI Agents Spend Your Money?](https://arxiv.org/abs/2604.22750).
+### Your Turn
 
-### Call to Action
+Don't start production feature work with autonomous modes, and only loop when you're genuinely willing to spend the tokens. Stay in the chair. Watch the first few tool calls and file edits, and the moment the approach looks off, **hit `esc` immediately**, then improve the prompt or spec before the trajectory becomes a larger diff.
 
-Don't start production feature work with autonomous modes. Stay in the chair. Watch the first few tool calls and file edits, and the moment the approach looks off, **hit `esc` immediately**, then triple-`esc` (or `/rewind`) back to a clean point and improve the prompt or spec. Don't type corrections, rewind and re-prompt. Fix the trajectory before it becomes a larger diff.
+**Sources:**
+
+- [Claude Code `/goal` documentation](https://code.claude.com/docs/en/goal)
+- [Claude Code Ralph Wiggum plugin](https://github.com/anthropics/claude-code/blob/main/plugins/ralph-wiggum/README.md)
+- [Claude Code best practices](https://code.claude.com/docs/en/best-practices)
+- [Boris on How Boris Uses Claude Code](https://howborisusesclaudecode.com/)
+- [How Do AI Agents Spend Your Money?](https://arxiv.org/abs/2604.22750)
 
 ---
 
@@ -253,21 +281,24 @@ Don't start production feature work with autonomous modes. Stay in the chair. Wa
 
 ### Advice
 
-When Claude goes the wrong way, rewind to the last good point instead of typing "actually, do X instead."
+When Claude goes the wrong way, rewind to the last good point instead of typing "actually, do X instead." Double-tap `esc` to jump back to an earlier checkpoint, or use the slash command, same operation either way.
 
 ```bash
-/rewind
+esc esc      # double-tap esc to rewind to an earlier checkpoint
+/rewind      # same thing via slash command, pick the exact point to return to
 ```
 
 ### Technical Explanation
 
-Corrective prompts add the wrong path AND the correction to context, doubling the cost of the mistake and giving the model conflicting signals on every turn afterward. `/rewind` drops everything after the chosen point, leaving a clean prefix.
+Corrective prompts add the wrong path AND the correction to context, doubling the cost of the mistake and giving the model conflicting signals on every turn afterward. `/rewind` (or `esc esc`) drops everything after the chosen point, leaving a clean prefix.
 
-**Sources:** [Boris on How Boris Uses Claude Code](https://howborisusesclaudecode.com/), *"the single habit that signals good context management is rewind, not correction."*
-
-### Call to Action
+### Your Turn
 
 Build the muscle memory. A wrong turn means `/rewind`, not "no wait, do it differently." Every correction-by-typing is a small leak.
+
+**Sources:**
+
+- [Boris on How Boris Uses Claude Code](https://howborisusesclaudecode.com/), *"the single habit that signals good context management is rewind, not correction."*
 
 ---
 
@@ -293,9 +324,9 @@ For a single turn that needs deeper reasoning without changing session level, dr
 
 The mental model is **team lead**. Opus `xhigh` is the most expensive seat in the org, you don't put it on tasks anyone can do. You put it on tasks that need judgment. In a coding session, the team lead reads the problem, decides the approach, owns the trajectory, reviews the work, and decides what's done. It doesn't personally fetch every file, run every test, summarize every doc, or grep every directory. Those are workforce tasks, and the workforce is Sonnet and Haiku.
 
-Anthropic's published guidance on large codebases frames this directly, subagents split exploration from editing. The pattern is "spin up a read-only subagent to map a subsystem and write findings to a file, then have the main agent edit with the full picture." Same principle scales down to smaller tasks. Read-heavy work (mapping a module, fetching docs, running a noisy test suite, processing logs, surveying changelogs) goes to a Sonnet or Haiku subagent. The main session, on Opus `xhigh`, takes the distilled output and reasons over it.
+Anthropic's large-codebase pattern is simple: use a read-only subagent to map a subsystem, then let the main agent edit with the distilled findings. Same principle scales down to smaller tasks. Read-heavy work (mapping a module, fetching docs, running a noisy test suite, processing logs, surveying changelogs) goes to a Sonnet or Haiku subagent. The main session, on Opus `xhigh`, takes the distilled output and reasons over it.
 
-Why the framing matters, most teams default to "Opus everywhere because it's the best." That's expensive *and* worse. Subagents run in isolated context windows, so the parent stays clean, and most of their work is well-scoped and verifiable, which is firmly Sonnet/Haiku territory. Running Opus on a subagent that's just summarizing a page burns ~5× the cost for zero quality gain. Worse, if Opus does the grunt work itself, the main context fills with raw output the team lead doesn't actually need to see.
+Most teams default to "Opus everywhere because it's the best." That burns cost on work Sonnet or Haiku can do, and it fills the parent context with raw output. Subagents run in isolated context windows, so the parent stays clean, and most of their work is well-scoped and verifiable. Running Opus on a subagent that's just summarizing a page burns ~5× the cost for zero quality gain.
 
 Boris recommends `xhigh` on Opus 4.7 as the default for coding and agentic tasks, it's the best quality/cost balance the platform offers. Adaptive reasoning spends more thinking tokens per step when effort goes up, that's valuable when the task benefits from reasoning, wasteful when the task is "do the thing I just told you to do." Operational work is mechanical, the reasoning premium is dead weight there.
 
@@ -306,9 +337,7 @@ The discipline that makes the team-lead pattern work:
 - **Parallelize when paths are independent.** Three independent subsystems means three subagents at once. Each gets its own context window, results merge in the parent.
 - **The team lead reviews before approving.** Don't blindly trust a subagent's summary. The lead reads it, asks follow-up questions if needed, then decides.
 
-**Sources:** [Claude Code model configuration](https://code.claude.com/docs/en/model-config#adjust-effort-level), [Claude Code sub-agents](https://code.claude.com/docs/en/sub-agents), [Anthropic on effort and adaptive reasoning](https://platform.claude.com/docs/en/build-with-claude/effort), [Anthropic on Claude Code in large codebases](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start).
-
-### Call to Action
+### Your Turn
 
 Keep two muscle memories. Coding session is `opus` + `xhigh`, treated as the team lead, not the implementer. Directive session is `sonnet` or `haiku` directly.
 
@@ -316,7 +345,14 @@ For delegation, give the main agent an instruction it can repeat throughout the 
 
 > *"Launch Sonnet sub-agents for specific and short implementation tasks (single-file edits, isolated test fixes, doc lookups, log scrapes, codebase mapping). Have each sub-agent return a distilled summary, not raw output. Review every summary before accepting it. Stay in this main session for design, decisions, and cross-file reasoning."*
 
-That one sentence is the team-lead operating manual. It tells the lead what to delegate, what to keep, what shape to expect back, and that review is non-negotiable.
+That instruction tells the main session what to delegate, what to keep, what shape the subagent output should have, and that review is non-negotiable.
+
+**Sources:**
+
+- [Claude Code model configuration](https://code.claude.com/docs/en/model-config#adjust-effort-level)
+- [Claude Code sub-agents](https://code.claude.com/docs/en/sub-agents)
+- [Anthropic on effort and adaptive reasoning](https://platform.claude.com/docs/en/build-with-claude/effort)
+- [Anthropic on Claude Code in large codebases](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start)
 
 ---
 
@@ -348,13 +384,13 @@ claude mcp add context-mode -- npx -y context-mode
 
 ### Technical Explanation
 
-Two things make output compression work, and both matter.
+Output compression works in two ways.
 
 First, intermediate results stay outside the main conversation. Claude only sees the summary, filtered output, or exact matching content it needs, not the multi-megabyte API response that would otherwise occupy thousands of tokens per turn. Context Mode's published examples show a 315KB session of raw output becoming ~5KB of summaries. RTK-AI reports 60-90% savings on common dev commands by rewriting shell commands through a compression proxy.
 
 Second, narrower information contracts produce better tool calls. A serialized kubectl-then-parse-then-jq sequence becomes one filtered result. A noisy `pytest`, `aws logs tail`, or Databricks query response becomes the failure, diff, or field Claude actually needs.
 
-This is the same principle behind Anthropic's published research on code execution with MCP, where moving tool execution and filtering outside the model loop took a tool-heavy workflow from 150,000 input tokens to 2,000, a 98.7% reduction.
+This is the same principle behind Anthropic's published research on code execution with MCP, where moving tool execution and filtering outside the model loop took a tool-heavy workflow from 150,000 input tokens to 2,000, a 98.7% drop.
 
 Options worth knowing:
 
@@ -364,11 +400,19 @@ Options worth knowing:
 - **Subagents.** Delegate noisy work to a Sonnet or Haiku subagent. The raw output stays in the subagent's window, only the distilled summary lands in the parent. Same pattern as Tip 7, applied to tool output instead of file reading.
 - **Plain CLI filtering.** `--json`, `jq`, `rg`, targeted commands, and `describe` subcommands. Splunk, CloudWatch (`aws logs tail`), Application Insights (`az monitor app-insights query`), and Grafana all have CLIs or query languages that support targeted output, use them instead of dumping raw log streams into context. Lowest dependency option, still works everywhere.
 
-**Sources:** [Context Mode (mksglu/context-mode)](https://github.com/mksglu/context-mode) (315KB → 5.4KB per session, 56KB Playwright snapshot → 299 bytes, session length ~30 min → ~3 hours), [Anthropic on code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) (150K → 2K input tokens), [Mert Köseoğlu on building Context Mode](https://mksg.lu/blog/context-mode), [RTK-AI / Rust Token Killer](https://github.com/rtk-ai/rtk), [RTK-AI docs](https://www.rtk-ai.app/), [Compresr Context Gateway](https://compresr.ai/docs/gateway), [Claude Code sub-agents](https://code.claude.com/docs/en/sub-agents).
-
-### Call to Action
+### Your Turn
 
 Pick the layer that matches the waste. For Claude Code tool snapshots and MCP-heavy workflows, install Context Mode with the two `/plugin` commands above and run `/context-mode:ctx-doctor` to verify. For noisy terminal output, try RTK-AI. For broad API-level compression, evaluate a gateway. For internal workflows at work, start with structured CLI output and subagent delegation before adding another tool.
+
+**Sources:**
+
+- [Context Mode (mksglu/context-mode)](https://github.com/mksglu/context-mode) (315KB → 5.4KB per session, 56KB Playwright snapshot → 299 bytes, session length ~30 min → ~3 hours)
+- [Anthropic on code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) (150K → 2K input tokens)
+- [Mert Köseoğlu on building Context Mode](https://mksg.lu/blog/context-mode)
+- [RTK-AI / Rust Token Killer](https://github.com/rtk-ai/rtk)
+- [RTK-AI docs](https://www.rtk-ai.app/)
+- [Compresr Context Gateway](https://compresr.ai/docs/gateway)
+- [Claude Code sub-agents](https://code.claude.com/docs/en/sub-agents)
 
 ---
 
@@ -376,11 +420,11 @@ Pick the layer that matches the waste. For Claude Code tool snapshots and MCP-he
 
 ### Advice
 
-When you have a choice between an MCP server and a CLI for the same job, pick the CLI. Pre-install and authenticate the toolbox **before** the session starts, the verification plan in your spec depends on it.
+When you have a choice between an MCP server and a CLI for the same job, pick the CLI. Claude Code already runs in the shell, so CLIs fit the default workflow. MCPs earn their place in browser-based or less technical surfaces where there's no terminal to lean on. Pre-install and authenticate the toolbox **before** the session starts. The verification plan in your spec depends on it.
 
 ### Technical Explanation
 
-The reason is structural. MCP servers create an ambient tool surface for the session. With Tool Search enabled, Claude Code defers full MCP tool schemas until needed, but tool names and server instructions still exist so Claude can decide when to search. If Tool Search is disabled, unsupported by the gateway, or bypassed with `alwaysLoad`, the tax gets worse because full tool definitions load upfront. CLIs run on demand and only put their output into context, same job with a different tax.
+MCP servers create an ambient tool surface for the session. With Tool Search enabled, Claude Code defers full MCP tool schemas until needed, but tool names and server instructions still exist so Claude can decide when to search. If Tool Search is disabled, unsupported by the gateway, or bypassed with `alwaysLoad`, the tax gets worse because full tool definitions load upfront. CLIs run on demand and only put their output into context, same job with a different tax.
 
 The gap widens for **agent-aware CLIs**, the ones built with an agent in mind from day one. The pattern that works:
 
@@ -393,7 +437,7 @@ A CLI built this way is essentially a tool definition you only pay for when invo
 
 #### Set up the toolbox before the session starts
 
-Verification is the highest-leverage habit in Tip 1, but verification only works if the agent can actually run it. Ask Claude to "make sure the deploy worked" with no `gh`, no `aws` configured, no log access, and no way to query the cluster, and it burns turns hunting for paths that don't exist. It tries `curl` against API endpoints it doesn't know, proposes installing tools, asks you to run commands, or quietly marks the work done without actually verifying.
+Verification only works when the agent can run the tools. If `gh`, `aws`, logs, or cluster access are missing, Claude burns turns looking for paths that don't exist. It tries `curl` against API endpoints it doesn't know, proposes installing tools, asks you to run commands, or quietly marks the work done without actually verifying.
 
 Pre-installing and authenticating the right CLIs *before* you start the session is one of the cheapest interventions you can make. The agent stops exploring and starts executing. Cost goes down because turns stop being spent on tool discovery. Quality goes up because verification commands actually run.
 
@@ -408,11 +452,15 @@ The toolbox depends on the work, common shape for an engineering session:
 
 If a tool isn't already installed and authenticated, the spec's verification plan can't depend on it. Either install it before you start, or rewrite the verification to use what you actually have.
 
-**Sources:** [Justin Poehnelt on why you need to rewrite your CLI for AI agents](https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/), [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp), [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices).
-
-### Call to Action
+### Your Turn
 
 Before a non-trivial session, run a quick toolbox check. The CLIs the spec's verification plan depends on need to be installed, authenticated, and pointing at the right account, cluster, or project. If not, fix that first. When building internal tools at work, follow the agent-friendly CLI patterns and confirm Claude can use the tool from `your-tool describe` alone, with no additional explanation from you.
+
+**Sources:**
+
+- [Justin Poehnelt on why you need to rewrite your CLI for AI agents](https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/)
+- [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp)
+- [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices)
 
 ---
 
@@ -434,13 +482,18 @@ CLAUDE_CONFIG_DIR=/tmp/empty-claude-cfg claude  # launch with no global config
 
 Every MCP server you connect adds something to the session. Tool Search keeps the full schemas out of context until needed, but it doesn't make the server free. Claude still sees tool names at session start, server instructions are used to decide when to search, and Claude Code truncates tool descriptions and server instructions at 2KB each. That limit exists because this surface has a cost. Add 15 servers "just in case" and you've made every session start with a bigger discovery problem before Claude has touched your code.
 
-The practical control surface is per session. Use local/project/user MCP scopes deliberately. For a one-off session, pass an explicit config with `claude --mcp-config path/to/mcp.json`. For a clean session, point `CLAUDE_CONFIG_DIR` at an empty directory and launch from a directory with no `.mcp.json`, `.claude`, or `CLAUDE.md`. Use `/mcp`, `/context`, and `/status` to see what actually loaded.
+Control this per session. Use local/project/user MCP scopes deliberately. For a one-off session, pass an explicit config with `claude --mcp-config path/to/mcp.json`. For a clean session, point `CLAUDE_CONFIG_DIR` at an empty directory and launch from a directory with no `.mcp.json`, `.claude`, or `CLAUDE.md`. Use `/mcp`, `/context`, and `/status` to see what actually loaded.
 
-**Sources:** [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp), [Claude Code debug configuration docs](https://code.claude.com/docs/en/debug-your-config), [Claude Code changelog](https://code.claude.com/docs/en/changelog), [Anthropic on MCP Tool Search](https://www.anthropic.com/news/tool-search-tool).
-
-### Call to Action
+### Your Turn
 
 Audit your MCP servers periodically. Disable anything you haven't used in the last few weeks. Prefer local or project scope over user scope. For task-specific servers, start Claude with an explicit `--mcp-config` and keep that session narrow. For internal servers your team owns, enable per-project via `.mcp.json` instead of globally. If a server is only needed for one session, enable it for that session and disable after.
+
+**Sources:**
+
+- [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp)
+- [Claude Code debug configuration docs](https://code.claude.com/docs/en/debug-your-config)
+- [Claude Code changelog](https://code.claude.com/docs/en/changelog)
+- [Anthropic on MCP Tool Search](https://www.anthropic.com/news/tool-search-tool)
 
 ---
 
@@ -448,7 +501,7 @@ Audit your MCP servers periodically. Disable anything you haven't used in the la
 
 ### Advice
 
-Install Anthropic's official LSP plugins for the languages you actually code in. They give Claude go-to-definition, find-references, hover docs, document symbols, and real-time diagnostics, code intelligence instead of grep.
+Install Anthropic's official LSP plugins for the languages you actually code in. They give Claude go-to-definition, find-references, hover docs, document symbols, and real-time diagnostics, so it can use code intelligence instead of searching everything with grep.
 
 Add the official marketplace once:
 
@@ -487,11 +540,14 @@ The token impact comes from collapsing search-and-iterate loops. Without LSP, Cl
 
 Twelve languages supported as of v2.0.74+, TypeScript, Python, Go, Rust, Swift, Kotlin, Java, C/C++, C#, PHP, Lua, Ruby. All of them are published in the [`anthropics/claude-plugins-official`](https://github.com/anthropics/claude-plugins-official) marketplace and follow the same `{language}-lsp@claude-plugins-official` naming pattern.
 
-**Sources:** [Claude Code plugin marketplace](https://code.claude.com/docs/en/discover-plugins), [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official).
-
-### Call to Action
+### Your Turn
 
 Add `anthropics/claude-plugins-official` once, install the LSP plugin for every language you actively work in, and verify with `/plugins`. For me, that almost always means `csharp-lsp` and `typescript-lsp`, with `pyright-lsp` if you touch Python scripting around the platform.
+
+**Sources:**
+
+- [Claude Code plugin marketplace](https://code.claude.com/docs/en/discover-plugins)
+- [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)
 
 ---
 
@@ -507,13 +563,16 @@ Don't kick off a hard task when you're already deep in a long conversation. Open
 
 ### Technical Explanation
 
-Response quality degrades as context fills, Anthropic's docs and the broader "context rot" literature both show this. The end of any window is the worst place to start something hard, you have less effective attention from the model, more noise competing for it, and you're closer to the auto-compact threshold, which then summarizes away the very work you just started.
+As context fills, quality drops. Starting a hard task near the end of the window gives the model more stale context, less room, and a higher chance of auto-compacting the work you just started.
 
-**Sources:** [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices), [Boris on How Boris Uses Claude Code](https://howborisusesclaudecode.com/) ("context rot kicks in around 300–400K tokens on the 1M context model").
-
-### Call to Action
+### Your Turn
 
 Before kicking off a non-trivial task, check your context indicator. If you're past comfortable middle-of-window territory, `/clear` and write a fresh brief that includes only what the new task needs.
+
+**Sources:**
+
+- [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices)
+- [Boris on How Boris Uses Claude Code](https://howborisusesclaudecode.com/) ("context rot kicks in around 300–400K tokens on the 1M context model")
 
 ---
 
@@ -521,7 +580,7 @@ Before kicking off a non-trivial task, check your context indicator. If you're p
 
 ### Advice
 
-Claude Code performance is mostly determined by the **harness** around the model, `CLAUDE.md` / `AGENTS.md` files, hooks, skills, plugins, MCP servers, and LSPs. Treat that surface as a product. Review it every 3 to 6 months, and use Anthropic's `claude-code-setup` plugin to get a recommendation pass over your repo when you're not sure what's missing.
+A lot of Claude Code performance comes from the **harness** around the model, `CLAUDE.md` / `AGENTS.md` files, hooks, skills, plugins, MCP servers, and LSPs. Treat that surface as a product. Review it every 3 to 6 months, and use Anthropic's `claude-code-setup` plugin to get a recommendation pass over your repo when you're not sure what's missing.
 
 Install `claude-code-setup` from the official marketplace:
 
@@ -534,15 +593,15 @@ Then ask Claude to run it against the current repo. The plugin is **read-only**,
 
 ### Technical Explanation
 
-The point isn't "use skills." Teams that focus only on which model they're running miss the levers that actually move performance. Anthropic's published guidance on large codebases is explicit, the harness matters as much as the model.
+Skills are only one artifact. Teams that only debate the model miss the other levers: repo instructions, hooks, skills, plugins, MCP servers, and LSPs.
 
-The progressive-disclosure principle ties it together, give Claude enough context to know where to look, then load the deeper knowledge only when the task calls for it. `AGENTS.md` / `CLAUDE.md` should be indexes, not manuals. Root files are for routing, critical gotchas, and broad conventions. Subdirectory files are for local commands and local rules. Skills are for reusable expertise or specialized workflows that should load on demand.
+Give Claude enough context to know where to look, then load deeper docs only when the task needs them. `AGENTS.md` / `CLAUDE.md` should be indexes, not manuals. Root files are for routing, critical gotchas, and broad conventions. Subdirectory files are for local commands and local rules. Skills are for reusable expertise or specialized workflows that should load on demand.
 
-This matters because project instruction files load automatically, so a bloated root file is a recurring tax and competes with the task. Anthropic's large-codebase guidance says successful deployments keep root context focused, layer subdirectory context, scope test/lint commands locally, and use skills for on-demand expertise.
+Project instruction files load automatically, so a bloated root file becomes a recurring tax and competes with the task. Anthropic's large-codebase guidance says successful deployments keep root context focused, layer subdirectory context, scope test/lint commands locally, and use skills for on-demand expertise.
 
-#### How to actually leverage progressive disclosure
+#### How progressive disclosure works in practice
 
-Skills are fine, but the goal is the discipline, not the artifact. Three concrete moves do most of the work:
+Skills are fine. The artifact matters less than the habit. Three concrete moves do most of the work:
 
 - **Keep the root `AGENTS.md` / `CLAUDE.md` short, ideally under ~60 lines.** It loads on every prompt, so every line is a recurring tax on every turn. Vercel's evals found that compressing a sprawling instructions file into a short, static routing table outperformed dynamic skill retrieval (100% vs 79% pass rate). Treat the root file as the table of contents, not the book.
 - **Make the root file a routing table.** A small map of *"if the user is asking about X, read `@path/to/X-guide.md` first."* Claude reads the table, follows the pointer, and only then does the deeper file enter context. The detailed doc stays out of the prefix until a task actually needs it. The vault's own [`AGENTS.md`](AGENTS.md) is a working example, a 3-column routing table plus a 5-step workflow, everything else lives behind `@`-pointers.
@@ -554,7 +613,9 @@ If your root file is more than a screenful, the progressive-disclosure principle
 
 When a session ran long because you had to redirect Claude, or you noticed it took several turns to figure out what you actually wanted, that's a signal the harness is missing something. Don't just close the laptop, the next session will repeat the same exploration.
 
-Before ending the session, ask Claude to write a short **lessons-learned doc** while the context is still fresh, what was unclear, what convention it didn't know, what file or tool it had to discover the hard way, what the correct shape of the answer should have been. Save it as a normal vault note (something like `lessons/<topic>.md`), then add a row to the root `AGENTS.md` routing table pointing the relevant task at it via `@lessons/<topic>.md`. The next time Claude touches that area of the codebase, the routing table sends it to the lesson before it starts guessing.
+Before ending the session, ask Claude for a short **lessons-learned doc** while the context is still fresh. Capture what was unclear, what convention was missing, what tool it had to discover, and what the answer should look like next time. Save it as a normal vault note (something like `lessons/<topic>.md`), then add a row to the root `AGENTS.md` routing table pointing the relevant task at it via `@lessons/<topic>.md`. The next time Claude touches that area of the codebase, the routing table sends it to the lesson before it starts guessing.
+
+When Claude had to write custom code to get your goal done, turn that code into a reusable tool for the next session. Make it a small script in your repo, built agent-aware following [Justin Poehnelt's rewrite-your-CLI-for-agents pattern](https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/) (a `describe` subcommand, `--json` output, meaningful exit codes, no interactive prompts). A lessons doc is a hint. A tool enforces the lesson each time it runs. Update these tools often as the work changes.
 
 This is the manual sibling of the Stop-hook pattern Anthropic recommends in the large-codebases post (where a Stop hook reflects on the session and proposes `CLAUDE.md` updates automatically). Dan Shipper made the same argument at the AI Engineer Code Summit 2025, *"persist the learning from every session back into `AGENTS.md`."* When an agent fails or wanders, the fix often belongs in `AGENTS.md` as a new routing-table row, convention, or workflow step, not just in your head.
 
@@ -562,23 +623,23 @@ This is the manual sibling of the Stop-hook pattern Anthropic recommends in the 
 
 [`claude-code-setup`](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-code-setup) is Anthropic's first-party recommender for harness configuration. It ships as a skill in the official marketplace and Claude invokes it to scan your codebase and recommend the top 1-2 automations across five categories:
 
-- **MCP Servers** — external integrations (context7 for docs, Playwright for frontend).
-- **Skills** — packaged expertise (Plan agent, frontend-design).
-- **Hooks** — automatic actions (auto-format, auto-lint, block sensitive files).
-- **Subagents** — specialized reviewers (security, performance, accessibility).
-- **Slash Commands** — quick workflows (`/test`, `/pr-review`, `/explain`).
+- **MCP Servers:** external integrations (context7 for docs, Playwright for frontend).
+- **Skills:** packaged expertise (Plan agent, frontend-design).
+- **Hooks:** automatic actions (auto-format, auto-lint, block sensitive files).
+- **Subagents:** specialized reviewers (security, performance, accessibility).
+- **Slash Commands:** quick workflows (`/test`, `/pr-review`, `/explain`).
 
-The skill is read-only by design, it analyzes but doesn't modify anything. You get a tailored list of "here is what would help most for this repo," then decide what to actually install. That's the right shape for a harness review, because it surfaces what you don't have without committing you to a change.
+The skill is read-only by design, it analyzes but doesn't modify anything. You get a tailored list of "here is what would help most for this repo," then decide what to actually install. It surfaces missing setup without committing you to a change.
 
 #### Hooks are not just gates, they're how the harness improves itself
 
 Most teams think of hooks as scripts that prevent Claude from doing something wrong (block writes to a path, enforce lint, intercept a dangerous command). Anthropic's large-codebase post highlights the more valuable use:
 
-- **Stop hooks** can reflect on what happened during a session and propose `CLAUDE.md` updates while the context is fresh. The harness gets better every time you finish a task instead of decaying.
+- **Stop hooks** can reflect on what happened during a session and propose `CLAUDE.md` updates while the context is fresh. The harness gets better after each task instead of decaying.
 - **Start hooks** can load module-specific context dynamically, so every developer gets the right setup for the part of the codebase they're touching without manual configuration.
 - **PreToolUse / PostToolUse hooks** enforce linting and formatting deterministically, more consistent than asking Claude to remember an instruction.
 
-The pattern, if you keep correcting the same thing manually, that's a hook. If you keep loading the same context manually, that's a hook. If a session keeps teaching you something about how Claude should behave, the lesson goes into the harness, not into your head.
+Repeated manual correction belongs in a hook. Repeated context loading belongs in a hook. Lessons from a session should go into the harness, not stay in your head.
 
 #### Configuration review every 3 to 6 months
 
@@ -586,11 +647,28 @@ Instructions written for the current model can work against a future one. Anthro
 
 Plan to review the harness every 3 to 6 months, and definitely whenever performance feels like it has plateaued after a major model release. Cut anything that's compensating for a problem the current model doesn't have. Run `claude-code-setup` during the review pass for a second opinion on what's still missing.
 
-**Sources:** [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices), [Anthropic on Claude Code in large codebases](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start), [Anthropic Skills progressive disclosure](https://platform.claude.com/docs/en/build-with-claude/skills-guide), [`claude-code-setup` plugin](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-code-setup), [Vercel, AGENTS.md outperforms skills in our agent evals](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals), [Claude Log on optimizing Claude Code token usage](https://claudelog.com/faqs/how-to-optimize-claude-code-token-usage/) (~60-line guidance), Dan Shipper at AI Engineer Code Summit 2025 ("persist the learning from every session back into AGENTS.md"), [On the Impact of AGENTS.md Files on the Efficiency of AI Coding Agents](https://arxiv.org/abs/2601.20404), [On the Use of Agentic Coding Manifests](https://arxiv.org/abs/2509.14744).
+### Your Turn
 
-### Call to Action
+Audit `AGENTS.md` periodically with a few concrete checks.
 
-Audit `AGENTS.md` periodically with three concrete checks: **(1)** is the root file under ~60 lines and shaped like a routing table, not a manual? **(2)** does every subtree with its own conventions have its own `AGENTS.md`? **(3)** after the last session you had to redirect, did you ask Claude for a lessons-learned note and wire it into the routing table? Push verbose how-tos into linked files behind `@`-pointers, delete sections that haven't been triggered in months, and move specialized-but-repeatable workflows behind a pointer or a skill instead of loading them into every session. Install `claude-code-setup` once with the two `/plugin` commands above, and run it whenever you start a harness review. Add a recurring calendar reminder, *"Claude Code harness review,"* every 3 to 6 months. After major model releases, run it sooner.
+Keep the root file under ~60 lines and shaped like a routing table, not a manual. Give every subtree with its own conventions a local `AGENTS.md`. After the last session you had to redirect, ask Claude for a lessons-learned note, or better, a reusable agent-aware tool, and wire it into the routing table.
+
+Push verbose how-tos into linked files behind `@`-pointers. Delete sections that haven't been triggered in months. Move specialized-but-repeatable workflows behind a pointer or a skill instead of loading them into every session.
+
+Install `claude-code-setup` once with the two `/plugin` commands above, and run it whenever you start a harness review. Add a recurring calendar reminder, *"Claude Code harness review,"* every 3 to 6 months. After major model releases, run it sooner.
+
+**Sources:**
+
+- [Anthropic Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices)
+- [Anthropic on Claude Code in large codebases](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start)
+- [Anthropic Skills progressive disclosure](https://platform.claude.com/docs/en/build-with-claude/skills-guide)
+- [`claude-code-setup` plugin](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-code-setup)
+- [Justin Poehnelt on why you need to rewrite your CLI for AI agents](https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/)
+- [Vercel, AGENTS.md outperforms skills in our agent evals](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals)
+- [Claude Log on optimizing Claude Code token usage](https://claudelog.com/faqs/how-to-optimize-claude-code-token-usage/) (~60-line guidance)
+- Dan Shipper at AI Engineer Code Summit 2025 ("persist the learning from every session back into AGENTS.md")
+- [On the Impact of AGENTS.md Files on the Efficiency of AI Coding Agents](https://arxiv.org/abs/2601.20404)
+- [On the Use of Agentic Coding Manifests](https://arxiv.org/abs/2509.14744)
 
 ---
 
@@ -602,17 +680,19 @@ Claude shouldn't just write the code and hand you a pile of unstaged files. Once
 
 ### Technical Explanation
 
-The reason is simple, the diff captures what changed, the commit message captures why. Six months later, nobody needs a commit message to narrate the files, Git can already show that. What you need is the reasoning the diff can't reconstruct, what was wrong, what decision was made, why that tradeoff was chosen, what verification passed, and what prompt or request shaped the work.
+The diff shows what changed. The commit message should preserve why: the original prompt, the decision, the tradeoff, and what passed verification. Six months later, Git can show the files. The commit message preserves the reasoning the diff can't reconstruct.
 
-Claude has that context immediately after implementation. It has the spec, the failed attempts, the edge cases, the verification output, and your actual words. Wait until later and write "fix auth bug" by hand, and the reasoning is gone from version history even if the code is correct. Worse, a future agent reading the history only sees a vague label and has to infer intent from the diff.
+Claude has that context immediately after implementation. It has the spec, the failed attempts, the edge cases, the verification output, and your actual words. Wait until later and write "fix auth bug" by hand, and the reasoning is gone from version history even if the code is correct. A good commit message becomes compressed context for future agents.
 
-This doesn't mean auto-commit everything. The working tree is still the review surface. Inspect the diff, decide what stays, stage one coherent logical change, then explicitly ask Claude to commit. The message should capture the prompt that initiated the work, the motivation, the decision, and the why. If a session touched unrelated concerns, split the commits by intent. Claude shouldn't push unless you explicitly ask.
+This doesn't mean auto-commit everything. Inspect the diff, stage one coherent change, and ask Claude to commit it. The message should capture the prompt that initiated the work, the motivation, the decision, and the why. If the session touched unrelated concerns, split by intent. Don't push unless you explicitly ask.
 
-**Sources:** [Claude Code best practices](https://code.claude.com/docs/en/best-practices).
-
-### Call to Action
+### Your Turn
 
 After implementation passes verification and you've reviewed the code, ask Claude *"commit this as logical units with messages that document the prompt, motivation, decision, and why."*
+
+**Sources:**
+
+- [Claude Code best practices](https://code.claude.com/docs/en/best-practices)
 
 ---
 
@@ -624,7 +704,7 @@ Habits worth naming so you can catch them in yourself and others:
 - **Opus as the implementer instead of the team lead.** Letting the main Opus session do its own grunt reads, log scrolls, and doc fetches fills the main context with raw output and burns the most expensive seat on the cheapest work. Delegate.
 - **Starting agentic work without the verification toolbox installed.** No `gh`, no `aws`, no log CLI, no working `kubectl` profile. The agent then burns turns hunting for ways to verify, or worse, marks the work done without actually verifying.
 - **The "kitchen sink session."** Long, mixed-topic conversations where you keep switching tasks instead of `/clear`-ing. Quality drops on every sub-task and you pay for the noise on every turn.
-- **Ignoring the uncached-token warning.** Claude Code is telling you, in plain text, that the next turn pays full input price on the whole prefix. Don't keep typing through it, `/clear` (or hand off and start fresh) is the answer the harness is asking for.
+- **Ignoring the uncached-token warning.** Claude Code is telling you, in plain text, that the next turn pays full input price on the whole prefix. Don't keep typing through it. `/clear`, or hand off and start fresh.
 - **Leaving a session idle for hours and coming back to it.** The cache is long dead, the next prompt pays full-price input on the whole prefix, and the context is now stale. Write a handoff, end the session, start fresh later.
 - **Correcting by typing instead of `/rewind`.** Every correction doubles the cost of the mistake and confuses the model with conflicting signals for the rest of the session.
 - **Leaving the commit to future-you.** The session has the reasoning. If the diff is verified, reviewed, and approved, have Claude preserve that reasoning in Git before it falls out of context.

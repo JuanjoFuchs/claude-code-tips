@@ -44,6 +44,7 @@ class Tip:
     advice_md: str = ""
     technical_md: str = ""
     cta_md: str = ""
+    sources_md: str = ""
 
 
 @dataclass
@@ -112,6 +113,25 @@ def split_by_h_with_fence(text: str, level: int) -> list[tuple[str, str]]:
     return result
 
 
+SOURCES_MARK_RE = re.compile(r"(?ms)^\*\*Sources:\*\*\s*\n?(?P<list>.*)$")
+
+
+def pull_sources(body: str) -> tuple[str, str]:
+    """Split a trailing '**Sources:**' block off a subsection body.
+
+    Returns (body_without_sources, sources_md). The sources_md is whatever
+    follows the '**Sources:**' label (a markdown bullet list in the README).
+    """
+    if not body:
+        return body, ""
+    m = SOURCES_MARK_RE.search(body)
+    if not m:
+        return body, ""
+    before = body[: m.start()].rstrip()
+    sources = m.group("list").strip()
+    return before, sources
+
+
 def slugify(text: str) -> str:
     s = text.lower()
     s = re.sub(r"[^\w\s-]", "", s)
@@ -138,7 +158,16 @@ def parse_readme(text: str) -> ParsedDoc:
     if sections and sections[0][0] == "":
         # Strip the standalone '---' divider lines that separate sections.
         intro = sections[0][1]
-        intro = re.sub(r"^\s*---\s*$", "", intro, flags=re.MULTILINE).strip()
+        intro = re.sub(r"^\s*---\s*$", "", intro, flags=re.MULTILINE)
+        # Drop README-only chrome (hero image, shield badges) so it doesn't
+        # leak into the site's own terminal hero, which has its own header.
+        intro = re.sub(
+            r"^\s*\[?!\[[^\]]*\]\([^)]*\)(?:\]\([^)]*\))?\s*$",
+            "",
+            intro,
+            flags=re.MULTILINE,
+        )
+        intro = re.sub(r"\n{3,}", "\n\n", intro).strip()
         doc.intro_md = intro
         sections = sections[1:]
 
@@ -160,8 +189,14 @@ def parse_readme(text: str) -> ParsedDoc:
                     tip.advice_md = sub_body
                 elif "technical" in key:
                     tip.technical_md = sub_body
-                elif "call to action" in key or key == "cta":
+                elif "your turn" in key or "call to action" in key or key == "cta":
                     tip.cta_md = sub_body
+            # Sources now live at the tail of the "Your Turn" subsection. Fall
+            # back to the technical section for older layouts.
+            tip.cta_md, sources = pull_sources(tip.cta_md)
+            if not sources:
+                tip.technical_md, sources = pull_sources(tip.technical_md)
+            tip.sources_md = sources
             doc.tips.append(tip)
         elif "tl;dr" in h2_title.lower():
             doc.tldr_md = body
@@ -329,13 +364,20 @@ def render_tip(tip: Tip) -> str:
     if tip.cta_md:
         sections.append(
             f'<section class="subsection cta">'
-            f'<h3 class="sub-head">▸ Call to Action</h3>'
+            f'<h3 class="sub-head">▸ Your Turn</h3>'
             f'<div class="sub-body">{md_to_html(tip.cta_md)}</div>'
             f'</section>'
         )
+    if tip.sources_md:
+        sections.append(
+            f'<details class="tip-sources">'
+            f'<summary>▸ Sources</summary>'
+            f'<div class="sub-body">{md_to_html(tip.sources_md)}</div>'
+            f'</details>'
+        )
     body = "\n".join(sections)
     haystack = " ".join(
-        [tip.title, tip.advice_md, tip.technical_md, tip.cta_md]
+        [tip.title, tip.advice_md, tip.technical_md, tip.cta_md, tip.sources_md]
     ).lower()
     haystack = re.sub(r"\s+", " ", haystack)[:1500]
     return f'''
@@ -864,6 +906,30 @@ a:hover { color: var(--link-hover); border-bottom-color: var(--link-hover); }
   padding: 14px 16px;
 }
 .subsection.cta .sub-body p:last-child { margin-bottom: 0; }
+
+/* ---------- Per-tip collapsible sources ---------- */
+.tip-sources {
+  margin: 18px 0 0;
+  border-top: 1px dashed var(--border-bright);
+  padding-top: 12px;
+}
+.tip-sources summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  list-style: none;
+  user-select: none;
+}
+.tip-sources summary::-webkit-details-marker { display: none; }
+.tip-sources summary::after { content: " ▾"; color: var(--fg-faint); }
+.tip-sources[open] summary::after { content: " ▴"; }
+.tip-sources summary:hover { color: var(--accent-warm); }
+.tip-sources .sub-body { margin-top: 10px; }
+.tip-sources .sub-body ul { margin: 0; padding-left: 18px; }
+.tip-sources .sub-body li { color: var(--fg-dim); font-size: 13px; }
 
 /* ---------- Code blocks (nested terminal frame) ---------- */
 .code-frame {
