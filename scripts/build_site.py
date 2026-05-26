@@ -29,6 +29,8 @@ ROOT = Path(__file__).resolve().parent.parent
 README = ROOT / "README.md"
 OUT_DIR = ROOT / "dist"
 OUT_FILE = OUT_DIR / "index.html"
+ROOT_LLMS_FILE = ROOT / "llms.txt"
+OUT_LLMS_FILE = OUT_DIR / "llms.txt"
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +66,22 @@ def strip_frontmatter(text: str) -> str:
         if end != -1:
             return text[end + 5 :]
     return text
+
+
+def render_llms_text(text: str) -> str:
+    """Render the canonical README Markdown into an agent-facing llms.txt."""
+    text = strip_frontmatter(text).strip()
+    # Drop README-only visual chrome. The generated file should be clean
+    # Markdown for agents, not a copy of the GitHub presentation shell.
+    text = re.sub(r"(?ms)^<p align=\"center\">.*?</p>\s*", "", text)
+    text = re.sub(
+        r"^\s*\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)\s*$",
+        "",
+        text,
+        flags=re.MULTILINE,
+    )
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text + "\n"
 
 
 def split_top_heading(text: str) -> tuple[str, str]:
@@ -1205,8 +1223,11 @@ def main() -> int:
         return 2
 
     html_out = render_html(doc)
+    llms_out = render_llms_text(text)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     OUT_FILE.write_text(html_out, encoding="utf-8")
+    ROOT_LLMS_FILE.write_text(llms_out, encoding="utf-8")
+    OUT_LLMS_FILE.write_text(llms_out, encoding="utf-8")
 
     print(f"  title:       {doc.title}")
     print(f"  tips parsed: {len(doc.tips)}")
@@ -1214,6 +1235,8 @@ def main() -> int:
     print(f"  anti-pat:    {'yes' if doc.anti_patterns_md else 'no'}")
     print(f"  sources:     {'yes' if doc.sources_md else 'no'}")
     print(f"  output:      {OUT_FILE}  ({OUT_FILE.stat().st_size:,} bytes)")
+    print(f"  llms root:   {ROOT_LLMS_FILE}  ({ROOT_LLMS_FILE.stat().st_size:,} bytes)")
+    print(f"  llms dist:   {OUT_LLMS_FILE}  ({OUT_LLMS_FILE.stat().st_size:,} bytes)")
     return 0
 
 

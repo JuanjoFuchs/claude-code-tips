@@ -1,10 +1,4 @@
-<p align="center">
-  <img src="assets/claude-code-tips-site.png" alt="Claude Code Engineering Tips rendered as a terminal-style site" width="900">
-</p>
-
 # Claude Code Engineering Tips
-
-[![Read the guide](https://img.shields.io/badge/Guide-View_on_GitHub_Pages-F06323?style=for-the-badge&logo=github&logoColor=white)](https://juanjofuchs.github.io/claude-code-tips/)
 
 How to use Claude Code well without wasting tokens. Every tip cites Anthropic docs, something Boris Cherny said publicly, or a published field heuristic.
 
