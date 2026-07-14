@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import html
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -31,6 +33,9 @@ OUT_DIR = ROOT / "dist"
 OUT_FILE = OUT_DIR / "index.html"
 ROOT_LLMS_FILE = ROOT / "llms.txt"
 OUT_LLMS_FILE = OUT_DIR / "llms.txt"
+OUT_SITEMAP_FILE = OUT_DIR / "sitemap.xml"
+
+SITE_URL = "https://juanjofuchs.github.io/claude-code-tips/"
 
 
 # ---------------------------------------------------------------------------
@@ -1211,6 +1216,55 @@ JS = r"""
 # ---------------------------------------------------------------------------
 
 
+def render_sitemap() -> str:
+    """Emit a one-URL sitemap for the guide.
+
+    This site lives in its own repo but is served under the user domain via GitHub
+    Pages project hosting, so the blog's jekyll-sitemap (38 URLs, generated from a
+    different repo) cannot see it. As of 2026-07-14 the page appeared in NO sitemap
+    at all: /sitemap.xml never mentioned it and /robots.txt advertised only the
+    blog's. It still got indexed (~4,890 impressions/180d) but sat at position ~19.
+
+    The real value here is `lastmod`, not discovery. This is a *living* guide, so the
+    point is telling Google when it changed and earning a recrawl, rather than waiting
+    to be noticed.
+    """
+    lastmod = _readme_lastmod()
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        "  <url>\n"
+        f"    <loc>{SITE_URL}</loc>\n"
+        f"    <lastmod>{lastmod}</lastmod>\n"
+        "    <changefreq>weekly</changefreq>\n"
+        "    <priority>0.8</priority>\n"
+        "  </url>\n"
+        "</urlset>\n"
+    )
+
+
+def _readme_lastmod() -> str:
+    """Last commit date of README.md, falling back to its mtime.
+
+    Prefer git over mtime: a fresh CI checkout rewrites mtimes to checkout time, which
+    would claim the guide changed on every build and train Google to ignore lastmod.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "log", "-1", "--format=%cs", "--", str(README)],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        stamp = out.stdout.strip()
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", stamp):
+            return stamp
+    except Exception:
+        pass
+    return datetime.fromtimestamp(README.stat().st_mtime, tz=timezone.utc).strftime("%Y-%m-%d")
+
+
 def main() -> int:
     if not README.exists():
         sys.stderr.write(f"error: README.md not found at {README}\n")
@@ -1228,6 +1282,7 @@ def main() -> int:
     OUT_FILE.write_text(html_out, encoding="utf-8")
     ROOT_LLMS_FILE.write_text(llms_out, encoding="utf-8")
     OUT_LLMS_FILE.write_text(llms_out, encoding="utf-8")
+    OUT_SITEMAP_FILE.write_text(render_sitemap(), encoding="utf-8")
 
     print(f"  title:       {doc.title}")
     print(f"  tips parsed: {len(doc.tips)}")
@@ -1237,6 +1292,7 @@ def main() -> int:
     print(f"  output:      {OUT_FILE}  ({OUT_FILE.stat().st_size:,} bytes)")
     print(f"  llms root:   {ROOT_LLMS_FILE}  ({ROOT_LLMS_FILE.stat().st_size:,} bytes)")
     print(f"  llms dist:   {OUT_LLMS_FILE}  ({OUT_LLMS_FILE.stat().st_size:,} bytes)")
+    print(f"  sitemap:     {OUT_SITEMAP_FILE}  (lastmod {_readme_lastmod()})")
     return 0
 
 
